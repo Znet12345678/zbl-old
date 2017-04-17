@@ -65,6 +65,7 @@ int ldr(const char *str,int drive){
 			kprintf("Attempting to load ELF don't worry if there are errors in this part\n");
 			int ldr_res = load_elf_from_memory(pntr);
 			kprintf("\nJumping to location\n");
+			__asm__("mov $0x105000,%esp");
 			void (*main)(void) = pntr;
 			main();
 			goto *pntr;

@@ -1,4 +1,4 @@
-CFLAGS = -nostdlib -std=gnu99 -DKERNEL -ffreestanding -DKERNEL
+CFLAGS = -nostdlib -std=gnu99 -DKERNEL -ffreestanding -DKERNEL -DMIN_DEBUG
 CC=i386-elf-gcc
 CRTBEGIN=$(shell $(CC) -print-file-name=crtbegin.o)
 CRTEND=$(shell $(CC) -print-file-name=crtend.o)
@@ -58,7 +58,7 @@ all:
 	nasm -f elf boot.asm -o boot.elf
 	i386-elf-gcc ${CFLAGS} -Tlinker.ld crti.o crtn.o boot.o _tty.o lib.o fs.o ata.o kernel.o kprintf.o mem.o io.o str.o libk/fs.o libk/str.o libk/err.o libk/io.o prim.o libzfs.o ${CRTBEGIN} ${CRTEND} -o kernel.elf
 #	./genfsfromfile fs.img  dummy.2.bin stage2.2.bin msg.txt kernel.lfs.bin kernel.lfs.elf dummy.bin helloworld.elf dummy.3.elf kernel.elf
-	./genfsfromfile fs.img kernel.elf stage2.2.bin kernel.minos.elf msg.txt bzimage
+	./genfsfromfile fs.img kernel.elf stage2.2.bin msg.txt
 	gcc genkernimg.c -o genkernimg
 	cat stage1.bin stage1.2.bin stage2.2.bin fs.img > bootloader.bin
 	cat stage1.bin stage1.2.bin hng.bin > hng.raw

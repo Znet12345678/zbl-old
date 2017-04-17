@@ -1,5 +1,5 @@
 #include <stdint.h>
-#include "libk/fs.h"
+#include "zfs.h"
 void print(const char *str){
 	kprintf("%s",str);
 }
@@ -42,6 +42,7 @@ char *strcpy(char *dest,const char *src){
 		i++;
 		j++;
 	}
+	dest[strlen(dest)] = 0;
 	return dest;
 }
 char *strcat(char *dest,const char *src){
@@ -50,17 +51,21 @@ char *strcat(char *dest,const char *src){
 int main(){
 	mem_init();
 	t_readvals();
-	kprintf("[KERNEL]Kernel successfully loaded!\n");
+	debug("KERNEL","Kernel successfully loaded!");
 	int l = __prim_getlba() + 1;
-	kprintf("[DEBUG]Starting LBA:%d\n",l);
+	kprintf("[KERNEL]Starting LBA:%d\n",l);
 	*(int*)0x501 = l;
 	if(is_zfs() < 0){
 		kprintf("No file system detected\n");
 		mkfs();
 	}
-	kprintf("[KERNEL]Done\n");
+	struct dirent *ent = parse_dirent("/");
+	kprintf("[alloc] %d [namelen] %d [name] %s [first_fent_lba] %d [first_fent_offset] %d [nxt_dirent_lba] %d [nxt_dirent_offset] %d [curr_ent_lba] %d [curr_ent_offset] %d\n",ent->alloc,ent->namelen,ent->name,ent->first_fent_lba,ent->first_fent_offset,ent->nxt_dirent_lba,ent->nxt_dirent_offset,ent->curr_ent_lba,ent->curr_ent_offset);
+	DIR *d = opendir("/");
+	mkdir("/test");
+	debug("KERNEL","Done");
 	while(1){
-		gets();
+		gets(0);
 		kprintf("\n");
 	}
 	/*char *malloctest1 = malloc(1024);
@@ -92,6 +97,4 @@ int main(){
 	}
 	mkdir("/test");
 	kprintf("Done\n");*/
-	while(1)
-		;
 }

@@ -28,7 +28,7 @@ void panic(){
 	while(1)
 		;
 }
-void strcpy(char *dest,const char *src){
+char *strcpy(char *dest,const char *src){
 	int i = strlen(dest);
 	int j = 0;
 	while(i < strlen(dest) + strlen(src)){
@@ -36,6 +36,7 @@ void strcpy(char *dest,const char *src){
 		i++;
 		j++;
 	}
+	return dest;
 }
 void strcat(char *dest,const char *src){
 	strcpy(&dest[strlen(dest) - 1],src);

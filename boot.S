@@ -10,15 +10,18 @@
 .long FLAGS
 .long CHECKSUM
 .section .bootstrap_stack, "aw", @nobits
-stack_bottom:
-.skip 16384 
-stack_top:
+;stack_bottom:
+;.skip 16384 
+;stack_top:
+.section .bss
+stack_begin:
+.skip 16384
+stack_end:
 .section .text
 .global _start
 BOOTSEG = 0x07c0
 _start:
-	movl $stack_top, %esp
-	mov $0x105000,%esp
+	movl $stack_end, %esp
 	call main
 	cli
 .Lhang:

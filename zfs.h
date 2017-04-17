@@ -1,6 +1,12 @@
-#ifndef __ZFS_H
-#define __ZFS_H
-const uint8_t sig[5] = {0x7F,'z','f','s',0};
+#ifndef __LIBZFS_H
+#define __LIBZFS_H
+#include <stdint.h>
+#include "lib.h"
+//const uint8_t sig[5] = {0x7F,'z','f','s',0};
+struct free_blk{
+	uint32_t lba;
+	uint16_t offset;
+};
 struct superblock{
 	uint8_t *sig;
 	uint32_t root_dirent_lba;
@@ -26,6 +32,10 @@ struct ent{
 	uint16_t nxt_dirent_offset;
 	//FILE
 };
+typedef struct{
+	struct dirent *dirent;
+	struct ent *ent;
+}DIR;
 #ifndef KERNEL
 int main(int argc,char *argv[]);
 #else
@@ -34,5 +44,6 @@ int is_zfs();
 int mkdir(const char *path);
 int mkfs_zfs(int lba);
 struct superblock *parse_superblk(int lba);
+struct dirent *parse_dirent(const char *path);
 #endif
 #endif

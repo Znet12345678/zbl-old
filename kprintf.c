@@ -187,6 +187,8 @@ void kprintf(const char *format,...){
 	va_end(args);
 	//place_cursor();
 }
-void debug(char *proccess,char *output){
+void debug(const char *proccess,const char *output){
+	#ifdef MIN_DEBUG || DEBUG
 	kprintf("[%s](debug):%s\n",proccess,output);
+	#endif
 }

@@ -1,12 +1,13 @@
 #ifndef __LIB_H
 #define __LIB_H
 #include <stdint.h>
+void debug(const char *func,const char *msg);
 int ata_write_master(uint8_t *buf,uint16_t _lba);
 int strncmp(const char *s1,const char *s2,int n);
 int __prim_getlba();
 void free(void *pntr);
 void error(const char *err);
-void strcpy(char *dest,const char *src);
+char *strcpy(char *dest,const char *src);
 unsigned long strlen(const char *str);
 void gets(char *str);
 void silent_gets(char *str);
