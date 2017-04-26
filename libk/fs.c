@@ -223,6 +223,7 @@ int offsetAt(uint32_t lba){
 		return -1;
 	goto a;
 }
+#ifdef OLD
 int write_ent(const char *name,__libk_dir_ent *prev,__libk_ent *went){
 	if(prev->nxt_ent_lba != 0){
 		error("004");
@@ -264,6 +265,7 @@ int write_ent(const char *name,__libk_dir_ent *prev,__libk_ent *went){
 	buf[offset + 19 + went->namelen] = went->nxt_ent_offset;
 	buf[offset + 20 + went->namelen] = went->nxt_ent_offset >> 8;
 }
+#endif
 int modify_dir_ent(const char *name,__libk_dir_ent *ent){
 	sblk *superblk = parse_sblk("/");
 	int lba = superblk->root_lba;

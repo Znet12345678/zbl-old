@@ -39,6 +39,7 @@ typedef struct{
 #ifndef KERNEL
 int main(int argc,char *argv[]);
 #else
+int countc(const char *str,char c);
 int mkfs();
 int is_zfs();
 int mkdir(const char *path);

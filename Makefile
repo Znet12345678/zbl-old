@@ -10,7 +10,7 @@ all:
 	i386-elf-gcc -c crti.S -o crti.o ${CFLAGS}
 	make -C libk
 	i386-elf-gcc ${CFLAGS} -c str.c -o str.o
-	i386-elf-gcc -c mem.c -o mem.o ${CFLAGS} -Werror 
+	i386-elf-gcc -c mem.c -o mem.o ${CFLAGS} -Werror
 	nasm -f elf dummy.start.asm -o dummy.start.o
 	nasm -f elf helloworld.asm -o helloworld.o
 	i386-elf-gcc helloworld.o -o helloworld.elf -nostdlib
@@ -73,3 +73,4 @@ all:
 	dd if=/dev/zero of=install.img.1 bs=1M count=100
 	cat install.pre install.img.1 > install.img
 	rm -f install.img.1
+	@echo "Install Image is install.img"

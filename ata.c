@@ -157,8 +157,8 @@ int ata_read_master(uint8_t *buf,uint32_t _lba,uint16_t drive){
 		#ifdef DEBUG
 		print("[ata]Using secondary drive\n");
 		#endif
-		io = 0x170;
-		cmd = 0xE0;
+		io = 0x1F0;
+		cmd = 0xF0;
 	}
 	else if(drive == 2)
 		io = 0x4138;

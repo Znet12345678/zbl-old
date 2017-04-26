@@ -63,6 +63,7 @@ int main(){
 	kprintf("[alloc] %d [namelen] %d [name] %s [first_fent_lba] %d [first_fent_offset] %d [nxt_dirent_lba] %d [nxt_dirent_offset] %d [curr_ent_lba] %d [curr_ent_offset] %d\n",ent->alloc,ent->namelen,ent->name,ent->first_fent_lba,ent->first_fent_offset,ent->nxt_dirent_lba,ent->nxt_dirent_offset,ent->curr_ent_lba,ent->curr_ent_offset);
 	DIR *d = opendir("/");
 	mkdir("/test");
+//	mkdir("/test2");
 	debug("KERNEL","Done");
 	while(1){
 		gets(0);

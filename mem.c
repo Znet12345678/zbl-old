@@ -33,22 +33,22 @@ struct mem_part *find_free(uint8_t *pntr,unsigned long size){
 	unsigned long alloc = 0;
 	struct mem_part *mem = (struct mem_part *)pntr;
 	if(mem->alloc == 0){
-		if(mem->size == 0 || mem->size > size){
+		if(mem->size == 0 || mem->size > (size + 1)){
 			mem->alloc = 1;
 			mem->size = size;
 			mem->complete = 1;
 			mem->nxt = 0;
-			mem->begin = (uint8_t*)(mem + sizeof(struct mem_part));
-			mem->end = mem->begin + size;
+			mem->begin = (uint8_t*)(mem + sizeof(struct mem_part)) + 1;
+			mem->end = mem->begin + size + 1;
 			alloc+=size;
 		}else{
 			mem->alloc = 1;
 			mem->complete = 0;
 			mem->n++;
 			mem->nxt = find_free(pntr + sizeof(struct mem_part) + size,size - alloc);
-			mem->begin = (uint8_t*)(mem + sizeof(struct mem_part));
+			mem->begin = (uint8_t*)(mem + sizeof(struct mem_part)) + 1;
 			mem->end = (uint8_t*)(mem + sizeof(struct mem_part) + mem->size);
-			alloc+=mem->size;
+			alloc+=mem->size - 1;
 		}
 	}else{
 		mem->n++;

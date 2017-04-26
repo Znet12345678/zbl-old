@@ -107,9 +107,15 @@ struct free_blk *find_freedent(int size){
 			if(currsize + curroffset > 512){
 				ret->lba = currlba + 1;
 				ret->offset = 0;
+				uint8_t *buf = malloc(1024);
+				ata_read_master(buf,ret->lba,0);
+				while(buf[0] != 0){
+					ret->lba++;
+					ata_read_master(buf,ret->lba,0);
+				}
 			}else{
 				ret->lba = currlba;
-				ret->offset = currsize + curroffset;
+				ret->offset = currsize;
 			}
 
 			return ret;
@@ -126,6 +132,12 @@ struct free_blk *find_freedent(int size){
         if(currsize + curroffset > 512){
         	ret->lba = currlba + 1;
                 ret->offset = 0;
+		uint8_t *buf = malloc(512);
+		ata_read_master(buf,ret->lba,0);
+		while(buf[0] != 0){
+			ret->lba++;
+			ata_read_master(buf,ret->lba,0);
+		}
         }else{
             	ret->lba = currlba;
                 ret->offset = currsize + curroffset;
@@ -156,19 +168,30 @@ int is_zfs(){
 	return ERR;
 }
 int write_dirent(struct dirent *ent,int lba,int offset){
+//	kprintf("Writing:%s:%d\n",ent->name,ent->namelen);
+//	kprintf("WRITE TO LBA:OFFSET %d:%d\n",lba,offset);
 	uint8_t *buf = malloc(1024);
 	int err = ata_read_master(buf,lba,0);
-	if(err < 0)
+	uint8_t *buf2 = malloc(512);
+	if(err < 0){
+		kprintf("Initial read of lba %d failed\n",lba);
+		debug("WRITE_DIRENT","Error 1");
 		return -1;
-	if((offset + sizeof(ent)) > 512){
-		err = ata_read_master(&buf[512],lba + 1,0);
-		if(err < 0)
+	}
+	if((offset + sizeof(*ent)) > 512){
+		debug("WRITE_DIRENT","Read 2 blocks");
+		err = ata_read_master(buf2,lba + 1,0);
+		if(err < 0){
+			debug("WRITE_DIRENT","Error 2");
 			return -1;
+		}
+		for(int i = 0; i < 513;i++)
+			buf[513 + i] = buf2[i];
 	}
 	buf[offset] = ent->alloc;
 	buf[offset + 1] = ent->namelen;
 	for(int i = 0; i < ent->namelen;i++)
-		buf[offset + 2] = ent->name[i];
+		buf[offset + 2 + i] = ent->name[i];
 	for(int i = 24; i >= 0;i-=8)
 		buf[offset + (24 - i)/8 + ent->namelen + 3] = ent->first_fent_lba >> i;
 	for(int i = 8; i >= 0;i-=8)
@@ -184,20 +207,30 @@ int write_dirent(struct dirent *ent,int lba,int offset){
 	if((offset + sizeof(*ent)) > 512){
 		debug("WRITE_DIRENT","Writing 2 blocks");
 		err = ata_write_master(buf,lba);
-		if(err < 0)
+		if(err < 0){
+			debug("WRITE_DIRENT","Error 3");
 			return -1;
-		err = ata_write_master(&buf[512],lba + 1);
-		if(err < 0)
+		}
+		uint8_t *tmp = malloc(512);
+		for(int i = 0; i < 512;i++)
+			tmp[i] = buf[512 + i];
+		err = ata_write_master(tmp,lba + 1);
+		if(err < 0){
+			debug("WRITE_DIRENT","Error 4");
 			return -1;
+		}
 	}else{
 		err = ata_write_master(buf,lba);
-		if(err < 0)
+		if(err < 0){
+			debug("WRITE_DIRENT","Error 5");
 			return -1;
+		}
 	}
 	free(buf);
+	free(buf2);
 	return 1;
 }
-int mkdir(const char *path){
+int __broken_mkdir(const char *path){
 	struct superblock *sblk = parse_superblk(*(int*)0x501);
 	if(strcmp(path,"/") == 0){
 		uint32_t lba = sblk->root_dirent_lba;
@@ -262,9 +295,9 @@ int mkdir(const char *path){
 		int offset = sblk->root_dirent_offset;
 		int write_lba = 0;
 		int write_offset = 0;
-		kprintf("Reading: %d:%d\n",lba,offset);
-		while(1 && lba != 0){
-			uint8_t *buf = malloc(1024);
+//		kprintf("Reading: %d:%d\n",lba,offset);
+		while(dent->nxt_dirent_lba != 0){
+			/*uint8_t *buf = malloc(1024);
 			int err = ata_read_master(buf,lba,0);
 			if(err < 0){
 				debug("MKDIR","failed to read");
@@ -277,7 +310,14 @@ int mkdir(const char *path){
 				break;
 			lba = _lba;
 			offset = _offset;
-			free(buf);
+			free(buf);*/
+			lba = dent->nxt_dirent_lba;
+			offset = dent->nxt_dirent_offset;
+			dent = parse_dent(dent->nxt_dirent_lba,dent->nxt_dirent_offset);
+			if(strcmp(dent->name,path) == 0){
+				kprintf("Error: Dir exists\n");
+				return -1;
+			}
 		}
 		char *name = malloc(80);
 		uint8_t *nbuf = malloc(512);
@@ -285,12 +325,25 @@ int mkdir(const char *path){
 		int namelen = nbuf[offset + 1];
 		for(int i = 0; i < namelen;i++)
 			name[i] = nbuf[2 + i];
-		struct dirent *prev = parse_dirent(name);
+		struct dirent *prev = dent;
+		if(prev == (struct dirent *)-1)
+			panic();
+		/*while(prev->nxt_dirent_lba != 0){
+			if(strcmp(prev->name,path) == 0){
+				kprintf("Error: Directory exists!\n");
+				return -1;
+			}
+			if(prev == (struct dirent *)-1)
+				panic();
+			lba = prev->nxt_dirent_lba;
+			offset = prev->nxt_dirent_offset;
+			prev = parse_dent(prev->nxt_dirent_lba,prev->nxt_dirent_offset);
+		}*/
+
 		uint8_t *buf = malloc(1024);
-		struct dirent *dent1 = malloc(sizeof(*dent1) * sizeof(dent1) + strlen(path));
+		struct dirent *dent1 = malloc(sizeof(*dent1) * sizeof(dent1));
 		dent1->alloc = 1;
 		dent1->namelen = strlen(path);
-
 		strcpy(dent1->name,path);
 		dent1->first_fent_lba = 0;
 		dent1->first_fent_offset = 0;
@@ -303,7 +356,7 @@ int mkdir(const char *path){
 			panic();
 		prev->nxt_dirent_lba = blk->lba;
 		prev->nxt_dirent_offset = blk->offset;
-		kprintf("%d %d\n",prev->nxt_dirent_lba,prev->nxt_dirent_offset);
+//		kprintf("%d %d\n",prev->nxt_dirent_lba,prev->nxt_dirent_offset);
 		/*if((offset + sizeof(*prev)) > 512){
 			prev->nxt_dirent_lba = lba + 1;
 			prev->nxt_dirent_offset = 0;
@@ -317,8 +370,175 @@ int mkdir(const char *path){
 			debug("MKDIR","Failed to write");
 			panic();
 		}
+//		kprintf("%d:%d\n",blk->lba,blk->offset);
+		err = write_dirent(dent1,blk->lba,blk->offset);
+		if(err < 0){
+			debug("MKDIR","Failed to write");
+			panic();
+		}
 	}
 	return ERR;
+}
+int isRootDir(const char *path){
+	int i = 0;
+	if(path[0] != '/')
+		return -1;
+	while(path[i] == '/')
+		i++;
+	while(path[i] != 0 && path[i] != '/')
+		i++;
+	if(path[i] == 0)
+		return 1;
+	while(path[i] != 0 && path[i] != '/')
+		i++;
+	if(path[i] == 0)
+		return 1;
+	return 0;
+}
+struct ent *_parse_ent(int lba,int offset){
+	uint8_t * buf = malloc(1024);
+	struct ent *ret = malloc(sizeof(*ret) * sizeof(ret));
+	ata_read_master(buf,lba,0);
+	ret->alloc = buf[offset];
+	for(int i = 24;i >= 0;i-=8)
+                ret->nxt_ent_lba |= buf[offset + 1 + (24 - i)/8] << i;
+        for(int i = 8; i>=0;i-=8)
+                ret->nxt_ent_offset|=buf[offset + 5 + (8 - i)/8] << i;
+        for(int i = 24; i >= 0;i-=8)
+                ret->nxt_dirent_lba|=buf[offset + 7 + (24 - i)/8] << i;
+        for(int i = 8; i >= 0;i-=8)
+                ret->nxt_dirent_offset|=buf[offset + 11 + (24 - i)/8] << i;
+        return ret;
+}
+struct ent* parse_ent(struct dirent *dent){
+	struct ent *ret = malloc(sizeof(*ret)*sizeof(ret));
+	uint8_t *buf = malloc(1025);
+	ata_read_master(buf,dent->curr_ent_lba,0);
+	uint8_t *extr = malloc(512);
+	ata_read_master(extr,dent->curr_ent_lba + 1,0);
+	for(int i = 0; i < 512;i++)
+		buf[i + 513] = extr[i];
+	int offset = dent->curr_ent_offset;
+	ret->alloc = buf[offset];
+	for(int i = 24;i >= 0;i-=8)
+		ret->nxt_ent_lba |= buf[offset + 1 + (24 - i)/8] << i;
+	for(int i = 8; i>=0;i-=8)
+		ret->nxt_ent_offset|=buf[offset + 5 + (8 - i)/8] << i;
+	for(int i = 24; i >= 0;i-=8)
+		ret->nxt_dirent_lba|=buf[offset + 7 + (24 - i)/8] << i;
+	for(int i = 8; i >= 0;i-=8)
+		ret->nxt_dirent_offset|=buf[offset + 11 + (24 - i)/8] << i;
+	return ret;
+}
+struct free_blk *find_free_ent(int root_lba,int root_offset,int size){
+	int i = 0;
+	int lba = 0;
+	int offset = 0;
+	struct dirent *dent = parse_dent(root_lba,root_offset);
+	while(dent->alloc == 1 && dent->nxt_dirent_lba > 0){
+		lba = dent->nxt_dirent_lba;
+		offset = dent->nxt_dirent_lba;
+		dent = parse_dent(lba,offset);
+	}
+	struct free_blk *ret = malloc(sizeof(*ret)*sizeof(ret));
+	ret->lba = lba;
+	ret->offset = offset + size;
+	if(ret->offset > 512){
+		ret->lba++;
+		ret->offset = 0;
+	}
+	return ret;
+}
+int write_ent(struct ent *ent,int lba, int offset){
+
+}
+int mkdir(const char *path){
+	if(strcmp(path,"/") == 0)
+		return __broken_mkdir(path);
+//	else if(isRootDir(path))
+//		return __broken_mkdir(path);
+	else{
+		int i = 0;
+		struct superblock *sblk = parse_superblk(*(int*)0x501);
+		struct dirent *ent = parse_dent(sblk->root_dirent_lba,sblk->root_dirent_offset);
+		while(1){
+			char *part1 = malloc(80);
+			while(path[i] == '/')
+				i++;
+			int j = 0;
+			while(path[i] != '/' && path[i] != 0){
+				part1[j] = path[i];
+				i++;
+				j++;
+			}
+			int brk = 0;
+			if(path[i] == 0)
+				break;
+			int lba = ent->nxt_dirent_lba;
+			int offset = ent->nxt_dirent_offset;
+			while(1){
+				if(strcmp(ent->name,part1) == 0)
+					break;
+				lba = ent->nxt_dirent_lba;
+				offset = ent->nxt_dirent_offset;
+				if(lba == 0 && (path[i] != 0 && path[i + 1] != 0)){
+					kprintf("No such file or directory:%s\n",part1);
+					return -1;
+				}else if(lba == 0)
+					break;
+				ent = parse_dent(lba,offset);
+			}
+			struct ent *rent = parse_ent(ent);
+			ent = parse_dent(rent->nxt_dirent_lba,rent->nxt_dirent_offset);
+		}
+		struct ent *rent = parse_ent(ent);
+		struct free_blk *fblk = find_free_ent(sblk->root_dirent_lba,sblk->root_dirent_offset,sizeof(*fblk));
+		struct ent *prev;
+		while(rent->nxt_dirent_lba != 0){
+			prev = rent;
+			rent = _parse_ent(rent->nxt_ent_lba,rent->nxt_ent_offset);
+		}
+		rent->nxt_dirent_lba = fblk->lba;
+		rent->nxt_dirent_offset = fblk->offset;
+		write_ent(rent,prev->nxt_ent_lba,prev->nxt_ent_offset);
+		struct dirent *fin = malloc(sizeof(*fin)*sizeof(fin));
+		fin->alloc = 1;
+		char *name = malloc(80);
+		int nc = countc(path,'/');
+		int j = 0,k = 0;
+		i = 0;
+		while(path[i] != 0){
+			if((k == nc && path[strlen(path) - 1] != '/') || (k == nc - 1 && path[strlen(path) - 1] == '/')){
+				name[j] = path[i];
+				j++;
+			}
+			if(path[i] == '/')
+				k++;
+			i++;
+		}
+		kprintf("%s\n",name);
+		fin->namelen = strlen(name);
+		strcpy(fin->name,name);
+		fin->first_fent_lba = 0;
+		fin->first_fent_offset = 0;
+		fin->nxt_dirent_lba = 0;
+		fin->nxt_dirent_offset = 0;
+		struct free_blk *fr = find_free_ent(sblk->root_dirent_lba,sblk->root_dirent_offset,sizeof(*fr));
+		fin->curr_ent_lba = fr->lba;
+		fin->curr_ent_offset = fr->offset;
+		write_dirent(fin,fblk->lba,fblk->offset);
+		
+	}
+}
+int countc(const char *str,char c){
+	int i = 0;
+	int ret = 0;
+	while(str[i] != 0){
+		if(str[i] == c)
+			ret++;
+		i++;
+	}
+	return ret;
 }
 int mkfs(){
 	return mkfs_zfs(*(int*)0x501);
